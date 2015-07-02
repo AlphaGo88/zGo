@@ -1,0 +1,109 @@
+
+.zGo-main{
+    position: relative;
+    margin: 0 auto;
+    padding: 20px
+}
+.zGo-canvasholder{
+    position: relative;
+}
+.zGo-board{
+    width: 100%;
+    height: 100%;
+    background-color: rgb(230,180,70);
+}
+.zGo-toplayer{
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+.zGo-toolbar{
+    position: relative;
+    background-color: rgb(27,88,184);
+    height: 40px;
+}
+.zGo-canvasholder, .zGo-board, .zGo-toplayer, .zGo-toolbar{
+    margin: 0;
+    padding: 0;
+}
+.zGo-moveNo{
+    position: absolute;
+    display: inline-block;
+    width: 50px;
+    margin-left: -25px; 
+    left: 50%;
+    font-size: 22px;
+    color: #fff;
+    line-height: 40px;
+    text-align: center;
+}
+
+/*buttons*/
+.zGo-btn{
+    position: absolute;
+    display: inline-block;
+    top: 50%;
+    margin-top: -12px;
+    height: 24px;
+    font-size: 0;
+}
+.zGo-btn:hover{
+    box-shadow: 0 0 8px #fff;
+}
+.zGo-btn:after, .zGo-btn:before{
+    content: ' ';
+    position: absolute;
+}
+.zGo-firstbtn{
+    left: 30%;
+}
+.zGo-backbtn{
+    left: 40%;
+}
+.zGo-nextbtn{
+    left: 60%;
+    margin-left: -15px;
+}
+.zGo-endbtn{
+    right: 30%;
+}
+.zGo-firstbtn, .zGo-endbtn{
+    width: 24px;
+}
+.zGo-backbtn, .zGo-nextbtn{
+    width: 16px;
+}
+.zGo-firstbtn:after, .zGo-backbtn:after{
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    border-right: 15px solid #fff;
+}
+.zGo-nextbtn:after, .zGo-endbtn:after{
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    border-left: 15px solid #fff;
+}
+
+.zGo-firstbtn:before{
+    height: 24px;
+    left: 2px;
+    border-left: 4px solid #fff;
+}
+.zGo-firstbtn:after{
+    left: 6px;
+}
+.zGo-endbtn:before{
+    right: 2px;
+    height: 24px;
+    border-right: 4px solid #fff;
+}
+.zGo-endbtn:after{
+    left: 2px;
+}
+
+
+
+

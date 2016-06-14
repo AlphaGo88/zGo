@@ -13,14 +13,13 @@
 			EDIT_MODE: 1
 		},
 
-		// 1 means black, -1 means white.
 		ColorType = {
 			'Black': 1,
 			'None': 0,
 			'White': -1
 		},
 
-		// 'Place' means the stone is manually edited.
+		// 'Place' means the stone is a setup.
 		NodeType = {
 			'Root': 0,
 			'Move': 1,
@@ -28,140 +27,49 @@
 			'Other': 3
 		};
 
-	Array.prototype.clone = function() {
-		var arr = [];
-		for (var i = 0; i < this.length; ++i) {
-			arr[i] = this[i].clone ? this[i].clone() : this[i];
-		}
-		return arr;
-	}
-
-	Array.prototype.isEqual = function(a) {
-		if (this.length != a.length) {
-			return false;
-		}
-		for (var i = 0; i < a.length; ++i) {
-			if ((this[i].isEqual && this[i].isEqual(a[i]) == false) || (!(this[i].isEqual) && this[i] != a[i])) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-
 	/**
-	 * For external use.
+	 * Nodes of the game.
 	 *
-	 * to initialize zGo
-	 *
-	 *
-	 * 
-	 */
-	var zGo = function(container, boardWidth, opt) {
-		var width = parseInt(boardWidth),
-			size = parseInt(opt),
-
-			// sgf that will be loaded
-			sgf,
-
-			game,
-			renderer,
-			sgfUtil;
-
-		// if container is not a dom element, return null.
-		if (!container.nodeType || container.nodeType !== 1) {
-			return null;
-		}
-
-		this.version = version;
-
-		width = (!isNaN(width) && width > 0 ? width : 520);
-		size = (!isNaN(size) && size >= 5 ? size : 19);
-
-		game = new GameTree(size);
-		sgfUtil = new SGFutil(game);
-		renderer = new Renderer(container, game, width);
-		if (typeof opt === "string") {
-			sgf = opt;
-			sgfUtil.loadSgf(sgf);
-			renderer.render();
-		}
-	}
-
-
-
-	/**
-	 * Nodes of the game is maitained in this tree.
-	 *
-	 * @size: specify board size, default is 19, optional
-	 * 
-	 * @opt: specify game information, optional
-	 * 
+	 * @size: board size, default 19
 	 * 
 	 */
 	function GameTree(size) {
 
 		var // board of root node
-			board = [],
+			emptyBoard = [],
 
 			size = size || 19,
-
-			mode = GameMode.PLAY_MODE,
 
 			// root node, which is the same for any game.
 			root,
 
-			// current move of the game (could also be an edited stone)
+			// current node of the game
 			current;
-
-		function Node(tpye, stone, board, opt) {
-
-			// sepecify node type.
-			this.type = tpye;
-
-			// board status of this node
-			this.board = board.clone();
-
-			this.stone = stone;
-
-			// in case this node has marks to display on the board
-			if (opt && opt['marks']) {
-				this.marks = opt['marks'];
-			}
-
-			this.deadBlack = (opt && opt['deadBlack']) || 0;
-			this.deadWhite = (opt && opt['deadWhite']) || 0;
-		}
 
 		// initialize board for root node.
 		for (var i = 0; i < size; ++i) {
-			board[i] = [];
+			emptyBoard[i] = [];
 			for (var j = 0; j < size; ++j) {
-				board[i][j] = ColorType.None;
+				emptyBoard[i][j] = ColorType.None;
 			}
 		}
 
 		// create root node.
-		root = new Node(NodeType.Root, null, board);
+		root = new Node(NodeType.Root, null, emptyBoard);
 
-		// 1 means black to play, white means white to play.
+		// 1 means black to play, -1 means white to play.
 		root.turn = 1;
 
-		// move count
 		root.number = 0;
 
 		current = root;
 
-		this.getGameMode = function() {
-			return mode;
-		}
+		this.size = size;
+		this.mode = GameMode.PLAY_MODE;
+		this.info = {};
 
-		this.setGameMode = function(newMode) {
-			mode = newMode;
-		}
-
-		this.getSize = function() {
-			return size;
+		this.setMode = function(newMode) {
+			this.mode = newMode;
 		}
 
 		this.getCurrentNode = function() {
@@ -188,8 +96,7 @@
 			current.turn = -turn;
 		}
 
-
-		// these change current pointer
+		// these change current node
 		this.next = function() {
 			if (current.next) {
 				current = current.next[0];
@@ -225,8 +132,7 @@
 			current = endNode;
 		}
 
-
-		// these don't change current pointer
+		// these don't change current node
 		this.getNextNode = function() {
 			if (current.next) {
 				return current.next[0];
@@ -244,7 +150,7 @@
 			while (nextMove && nextMove[0].type !== NodeType.Move) {
 				nextMove = nextMove.next;
 			}
-			return nextMove && nextMove[0] ;
+			return nextMove && nextMove[0];
 		}
 		this.getPrevMove = function() {
 			var prev = current.prev;
@@ -266,24 +172,178 @@
 
 		// reset game tree
 		this.reset = function() {
-			root = new Node(NodeType.Root, null, root.board);
-			root.turn = 1;
+			root.next = null;
 			current = root;
 		}
 
+		this.makeMove = function(x, y, color) {
+			var // for ko situation.
+				lastBoard = current.prev ? current.prev.board : null,
 
+				curBoard = current.board,
+				newBoard = copyBoardArr(curBoard);
 
-		// remove the stone from point(x,y).
-		/*this.removeStone = function(x, y) {
-			var node = new Place(current, null, current.board);
-			current.next = node;
+			// can't play at point[y,x] having stone.
+			if (newBoard[y][x] != ColorType.None) {
+				return -1;
+			}
+
+			// color to play, shift color by default, black first.
+			if (color) {
+				newBoard[y][x] = color;
+			} else {
+				newBoard[y][x] = (current.color === ColorType.None ? ColorType.Black : -current.color);
+			}
+
+			// remove dead stones.
+			var dead = 0;
+			if (x > 0 && !hasLiberty(newBoard, x - 1, y) && newBoard[y][x] !== newBoard[y][x - 1]) {
+				dead += removeString(newBoard, x - 1, y);
+			}
+			if (x < size - 1 && !hasLiberty(newBoard, x + 1, y) && newBoard[y][x] !== newBoard[y][x + 1]) {
+				dead += removeString(newBoard, x + 1, y);
+			}
+			if (y > 0 && !hasLiberty(newBoard, x, y - 1) && newBoard[y][x] !== newBoard[y - 1][x]) {
+				dead += removeString(newBoard, x, y - 1);
+			}
+			if (y < size - 1 && !hasLiberty(newBoard, x, y + 1) && newBoard[y][x] !== newBoard[y + 1][x]) {
+				dead += removeString(newBoard, x, y + 1);
+			}
+
+			// Handle self capture and ko
+			if ((dead === 0 && !hasLiberty(newBoard, x, y)) || (lastBoard && newBoard.toString() === lastBoard.toString())) {
+				return -1;
+			}
+
+			var opt = {};
+			if (newBoard[y][x] === ColorType.Black) {
+				opt['deadWhite'] = dead;
+			} else if (newBoard[y][x] == ColorType.White) {
+				opt['deadBlack'] = dead;
+			}
+
+			// add new move to game tree.
+			var move = new Node(NodeType.Move, {
+				x: x,
+				y: y,
+				color: color
+			}, newBoard, opt);
+
+			// change whom to play
+			move.turn = -color;
+
+			move.number = current.number + 1;
+
+			// case1: add node to the end of the branch
+			// case2: create new branch
+			if (!current.next) {
+				current.next = [];
+			}
+			current.next.push(move);
+			move.prev = current;
+			current = move;
+
+			return dead;
+		}
+
+		this.placeStone = function(x, y, color) {
+			var curBoard = current.board,
+				newBoard = copyBoardArr(curBoard);
+
+			if (newBoard[y][x] !== ColorType.None) {
+				return false;
+			}
+
+			if (color) {
+				newBoard[y][x] = color;
+			} else {
+				newBoard[y][x] = (current.color === ColorType.None ? ColorType.Black : -current.color);
+			}
+
+			// remove dead stones.
+			var dead = 0;
+			if (x > 0 && hasLiberty(newBoard, x - 1, y) == false && newBoard[y][x] != newBoard[y][x - 1]) {
+				dead += removeString(newBoard, x - 1, y);
+			}
+			if (x < size - 1 && hasLiberty(newBoard, x + 1, y) == false && newBoard[y][x] != newBoard[y][x + 1]) {
+				dead += removeString(newBoard, x + 1, y);
+			}
+			if (y > 0 && hasLiberty(newBoard, x, y - 1) == false && newBoard[y][x] != newBoard[y - 1][x]) {
+				dead += removeString(newBoard, x, y - 1);
+			}
+			if (y < size - 1 && hasLiberty(newBoard, x, y + 1) == false && newBoard[y][x] != newBoard[y + 1][x]) {
+				dead += removeString(newBoard, x, y + 1);
+			}
+
+			// Handle: self capture
+			if ((dead == 0 && hasLiberty(newBoard, x, y) == false)) {
+				return false;
+			}
+
+			// add the edited stone to game tree.
+			var node = new Node(NodeType.Place, {
+				x: x,
+				y: y,
+				color: color
+			}, newBoard);
+
+			// doesn't change whom to play or move number
+			node.turn = current.turn;
+			node.number = current.number;
+
+			// case1: add node to the end of the branch
+			// case2: create new branch
+			if (!current.next) {
+				current.next = [];
+			}
+			current.next.push(node);
+			node.prev = current;
 			current = node;
-			current.board[y][x] = ColorType.None;
-			current.type = NodeType.Place;
-		}*/
+
+			return true;
+		}
+
+		this.addMark = function(x, y, mark) {
+			if (mark === undefined) {
+				return;
+			}
+			current.marks[y][x] = mark;
+		}
+
+		this.removeMark = function(x, y) {
+			current.marks[y][x] = MarkupType.None;
+		}
+
+		function copyBoardArr(boardArr) {
+			var i, ret = [];
+			for (i = 0; i < boardArr.length; i++) {
+				ret.push(boardArr[i].slice());
+			}
+			return ret;
+		}
+
+		// constructor of node
+		function Node(tpye, stone, board, opt) {
+
+			// sepecify node type.
+			this.type = tpye;
+
+			// board status of this node
+			this.board = board;
+
+			this.stone = stone;
+
+			// in case this node has marks to display on the board
+			if (opt && opt['marks']) {
+				this.marks = opt['marks'];
+			}
+
+			this.deadBlack = (opt && opt['deadBlack']) || 0;
+			this.deadWhite = (opt && opt['deadWhite']) || 0;
+		}
 
 		// Whether point[y,x] has liberty.
-		var hasQi = function(board, x, y, access) {
+		function hasLiberty(board, x, y, access) {
 			var color = board[y][x];
 			if (x < 0 || y < 0 || x >= size || y >= size) {
 				return false;
@@ -302,14 +362,14 @@
 				}
 			}
 			access[y][x] = true;
-			if ((x > 0 && access[y][x - 1] == false && board[y][x - 1] == color && hasQi(board, x - 1, y, access)) || (y > 0 && access[y - 1][x] == false && board[y - 1][x] == color && hasQi(board, x, y - 1, access)) || (x < size - 1 && access[y][x + 1] == false && board[y][x + 1] == color && hasQi(board, x + 1, y, access)) || (y < size - 1 && access[y + 1][x] == false && board[y + 1][x] == color && hasQi(board, x, y + 1, access))) {
+			if ((x > 0 && access[y][x - 1] == false && board[y][x - 1] == color && hasLiberty(board, x - 1, y, access)) || (y > 0 && access[y - 1][x] == false && board[y - 1][x] == color && hasLiberty(board, x, y - 1, access)) || (x < size - 1 && access[y][x + 1] == false && board[y][x + 1] == color && hasLiberty(board, x + 1, y, access)) || (y < size - 1 && access[y + 1][x] == false && board[y + 1][x] == color && hasLiberty(board, x, y + 1, access))) {
 				return true;
 			}
 			return false;
 		}
 
 		// Remove dead stones.
-		var removeString = function(board, x, y) {
+		function removeString(board, x, y) {
 			var color = board[y][x],
 				dead = 1;
 
@@ -338,210 +398,89 @@
 			return dead;
 		}
 
-		this.makeMove = function(x, y, color) {
-			var // for ko situation.
-				lastBoard = current.prev ? current.prev.board : null,
-
-				curBoard = current.board,
-				newBoard = curBoard.clone();
-
-			// can't play at point[y,x] having stone.
-			if (newBoard[y][x] != ColorType.None) {
-				return -1;
-			}
-
-			// color to play, shift color by default, black first.
-			if (color) {
-				newBoard[y][x] = color;
-			} else {
-				newBoard[y][x] = (current.color === ColorType.None ? ColorType.Black : -current.color);
-			}
-
-			// remove dead stones.
-			var dead = 0;
-			if (x > 0 && !hasQi(newBoard, x - 1, y) && newBoard[y][x] !== newBoard[y][x - 1]) {
-				dead += removeString(newBoard, x - 1, y);
-			}
-			if (x < size - 1 && !hasQi(newBoard, x + 1, y) && newBoard[y][x] !== newBoard[y][x + 1]) {
-				dead += removeString(newBoard, x + 1, y);
-			}
-			if (y > 0 && !hasQi(newBoard, x, y - 1) && newBoard[y][x] !== newBoard[y - 1][x]) {
-				dead += removeString(newBoard, x, y - 1);
-			}
-			if (y < size - 1 && !hasQi(newBoard, x, y + 1) && newBoard[y][x] !== newBoard[y + 1][x]) {
-				dead += removeString(newBoard, x, y + 1);
-			}
-
-			// Handle:
-			// self capture
-			// ko
-			if ((dead === 0 && !hasQi(newBoard, x, y)) || (lastBoard && newBoard.isEqual(lastBoard))) {
-				return -1;
-			}
-
-			var opt = {};
-			if (newBoard[y][x] === ColorType.Black) {
-				opt['deadWhite'] = dead;
-			} else if (newBoard[y][x] == ColorType.White) {
-				opt['deadBlack'] = dead;
-			}
-
-			// add new move to game tree.
-			var move = new Node(NodeType.Move, {
-				x: x,
-				y: y,
-				color: color
-			}, newBoard, opt);
-
-			// change whom to play
-			move.turn = -color;
-
-			// move count
-			move.number = current.number + 1;
-
-			// case1: add node to the end of the branch
-			// case2: create new branch
-			if (!current.next) {
-				current.next = [];
-			}
-			current.next.push(move);
-			move.prev = current;
-			current = move;
-
-			return dead;
-		}
-
-		this.placeStone = function(x, y, color) {
-			var
-				curBoard = current.board,
-				newBoard = curBoard.clone();
-
-			if (newBoard[y][x] !== ColorType.None) {
-				return false;
-			}
-
-			if (color) {
-				newBoard[y][x] = color;
-			} else {
-				newBoard[y][x] = (current.color === ColorType.None ? ColorType.Black : -current.color);
-			}
-
-			// remove dead stones.
-			var dead = 0;
-			if (x > 0 && hasQi(newBoard, x - 1, y) == false && newBoard[y][x] != newBoard[y][x - 1]) {
-				dead += removeString(newBoard, x - 1, y);
-			}
-			if (x < size - 1 && hasQi(newBoard, x + 1, y) == false && newBoard[y][x] != newBoard[y][x + 1]) {
-				dead += removeString(newBoard, x + 1, y);
-			}
-			if (y > 0 && hasQi(newBoard, x, y - 1) == false && newBoard[y][x] != newBoard[y - 1][x]) {
-				dead += removeString(newBoard, x, y - 1);
-			}
-			if (y < size - 1 && hasQi(newBoard, x, y + 1) == false && newBoard[y][x] != newBoard[y + 1][x]) {
-				dead += removeString(newBoard, x, y + 1);
-			}
-
-			// Handle: self capture
-			if ((dead == 0 && hasQi(newBoard, x, y) == false)) {
-				return false;
-			}
-
-			// add the edited stone to game tree.
-			var node = new Node(NodeType.Place, {
-				x: x,
-				y: y,
-				color: color
-			}, newBoard);
-
-			// doesn't change who to play
-			node.turn = current.turn;
-
-			// dosen't change number of moves
-			node.number = current.number;
-
-			// case1: add node to the end of the branch
-			// case2: create new branch
-			if (!current.next) {
-				current.next = [];
-			}
-			current.next.push(node);
-			node.prev = current;
-			current = node;
-
-			return true;
-		}
-
-		this.addMark = function(x, y, mark) {
-			if (mark === undefined) {
-				return;
-			}
-			current.marks[y][x] = mark;
-		}
-
-		this.removeMark = function(x, y) {
-			current.marks[y][x] = MarkupType.None;
-		}
-
 	}
 
-	// sgf utilities
-	function SGFutil(gameTree) {
-		var game = gameTree;
-
+	/**
+	 * sgf Support.
+	 * 
+	 */
+	function SGFUtil(game) {
 		this.loadSgf = function(sgf) {
 			var sgfStr = sgf,
 				level = -1,
-				curNode = {},
 				isValue = false,
+				propName = "",
+				propValue = "",
 				curChar,
-				nextChar;
+				x,
+				y,
+				color;
 
 			if (!sgf) {
-				return null;
+				return;
 			}
 
 			for (var i = 0; i < sgfStr.length; i++) {
 				curChar = sgfStr.charAt(i);
-				nextChar = sgfStr.charAt(i + 1);
 
 				// Handle: current char is a property's value
 				if (isValue) {
 
-					var name = curNode.name,
-						prop = curNode.curProp,
-						value = curNode.curValue,
-						x,
-						y,
-						color;
-
 					// end of property value
 					if (curChar === "]") {
-						isValue = false;
-						continue;
-					}
+						switch (propName) {
 
-					// move
-					if (name === "B" || name === "W") {
-
-						// in move property
-						if (prop === "B" || prop === "W") {
-
-							// Get move's coordinates and add it to game tree.
-							// a-s represent 0-18 on the board
-							if (97 <= curChar <= 115) {
-								if (!value || value === "") {
-									x = curChar.charCodeAt(0) - 97;
-									curNode.curValue = curChar;
-								} else {
-									x = value.charCodeAt(0) - 97;
-									y = curChar.charCodeAt(0) - 97;
-									color = (prop === "B" ? 1 : -1);
+							// black's move or white's move
+							case "B":
+							case "W":
+								{
+									x = propValue.charCodeAt(0) - 97;
+									y = propValue.charCodeAt(1) - 97;
+									color = (propName === "B" ? 1 : -1);
 									game.makeMove(x, y, color);
+									break;
 								}
-							}
-						}
-					}
 
+								// game info properties
+							case "DT":
+								{
+									game.info.date = propValue;
+								}
+							case "EV":
+								{
+									game.info.event = propValue;
+								}
+							case "RE":
+								{
+									game.info.result = propValue;
+								}
+							case "RU":
+								{
+									game.info.rules = propValue;
+								}
+							case "PB":
+								{
+									game.info.playerb = propValue;
+								}
+							case "BR":
+								{
+									game.info.brank = propValue;
+								}
+							case "PW":
+								{
+									game.info.playerw = propValue;
+								}
+							case "WR":
+								{
+									game.info.wrank = propValue;
+								}
+						}
+
+						isValue = false;
+						propName = propValue = "";
+					} else {
+						propValue += curChar;
+					}
 
 				} else {
 					switch (curChar) {
@@ -549,42 +488,16 @@
 						// end of node
 						case ";":
 							{
-								curNode = {};
-								break;
-							}
-
-							// start of property value
-						case "[":
-							{
-								isValue = true;
-								break;
-							}
-
-						case "B":
-							{
-								// Handle "BL","BM","BR","BT"
-								if ('A' <= nextChar <= 'Z') {
-									curNode.curProp = curNode.name = curChar + nextChar;
-								} else {
-									curNode.curProp = curNode.name = curChar;
-								}
-								break;
-							}
-						case "W":
-							{
-								// Handle "WL","WR","WT"
-								if ('A' <= nextChar <= 'Z') {
-									curNode.curProp = curNode.name = curChar + nextChar;
-								} else {
-									curNode.curProp = curNode.name = curChar;
-								}
+								propName = "";
+								propValue = "";
 								break;
 							}
 
 							// start of branch
 						case "(":
 							{
-								curNode = {};
+								propName = "";
+								propValue = "";
 								level++;
 								break;
 							}
@@ -592,23 +505,25 @@
 							// end of branch
 						case ")":
 							{
-								curNode = {};
+								propName = "";
+								propValue = "";
 								level--;
 								break;
 							}
 
-						case "S":
+							// start of property value
+						case "[":
 							{
-								if (nextChar === "Z") {
-
-								}
+								isValue = true;
+								propValue = "";
 								break;
 							}
 
 						default:
 							{
-
+								propName += curChar;
 							}
+
 					}
 				}
 
@@ -618,62 +533,39 @@
 
 	}
 
-
-
 	/**
 	 * Render zGo to html.
 	 * 
-	 * @container	the dom element which holds zGo
-	 * 
-	 * @width(integer)   specify pixels of board's width
-	 * 
 	 */
-	function Renderer(container, gameTree, boardWidth) {
-		var
-			game = gameTree,
-			size = game.getSize(),
+	function Renderer(container, game, boardWidth) {
+		var size = game.size,
 
 			// width(height) of the canvas
 			canvasWidth = boardWidth,
 
-			// width(height) of board's grid in the canvas
+			// width(height) of the board's grid
 			gridWidth = canvasWidth / (size + 1),
 
-			// width of board's edge to the lines in the canvas
-			edgeWidth = gridWidth,
+			// width between the board's edge and the 1st line
+			edgeWidth = gridWidth;
 
-			// This div contains everything.
-			mainDiv = document.createElement("div"),
-
-			canvasHolder = document.createElement("div"),
-
-			// canvas for board
-			board = document.createElement("canvas"),
-
-			// canvas for stones
-			topLayer = document.createElement("canvas"),
-
-			// game controller
-			toolbar = document.createElement("div"),
-
-			ctx = board.getContext('2d'),
-			ctx1 = topLayer.getContext('2d');
-
-		mainDiv.className = "zGo-main";
+		// This div contains zGo.
+		var mainDiv = document.createElement("div");
+		mainDiv.className = "zgo-main";
 		mainDiv.style.width = boardWidth + "px";
 
-		canvasHolder.className = "zGo-canvasholder";
+		var canvasHolder = document.createElement("div");
+		canvasHolder.className = "zgo-canvasholder";
 		canvasHolder.style.width = boardWidth + "px";
 		canvasHolder.style.height = boardWidth + "px";
 
-		board.className = "zGo-board";
+		//// draw board start
+		var board = document.createElement("canvas");
+		board.className = "zgo-board";
 		board.width = canvasWidth;
 		board.height = canvasWidth;
 
-		topLayer.className = "zGo-toplayer";
-		topLayer.width = canvasWidth;
-		topLayer.height = canvasWidth;
-
+		var ctx = board.getContext('2d');
 		ctx.save();
 		ctx.translate(0.5, 0.5);
 		ctx.lineWidth = 1;
@@ -742,22 +634,24 @@
 		}
 
 		ctx.restore();
+		//// draw board end
 
-		topLayer.onMouseOver = function(e) {
+		// canvas for stones
+		var topLayer = document.createElement("canvas");
+		topLayer.className = "zgo-toplayer";
+		topLayer.width = canvasWidth;
+		topLayer.height = canvasWidth;
 
-		}
+		var ctx1 = topLayer.getContext('2d');
 
 		topLayer.onclick = function(e) {
-			var
-				e = e || window.event,
-
+			var e = e || window.event,
 				color = game.getTurn(),
-				mode = game.getGameMode(),
+				mode = game.mode,
 				curNode = game.getCurrentNode(),
 				lastMove = (curNode.type === NodeType.Move ? curNode.stone : null),
 
-				// Calculate mouse's position on the board,
-				// to decide which point is clicked.
+				// Calculate which point is clicked.
 				rect = board.getBoundingClientRect(),
 				x = (e.clientX - rect.left) * (board.width / rect.width),
 				y = (e.clientY - rect.top) * (board.height / rect.height),
@@ -767,11 +661,10 @@
 				dead,
 				oldBoard;
 
-			// point's [x,y]
 			x = coordX * gridWidth + edgeWidth;
 			y = coordY * gridWidth + edgeWidth;
 
-			// make move or place a stone
+			// make a move or place a stone
 			if (mode === GameMode.PLAY_MODE) {
 				dead = game.makeMove(coordX, coordY, color);
 			} else if (mode === GameMode.EDIT_MODE) {
@@ -788,105 +681,94 @@
 
 		canvasHolder.appendChild(board);
 		canvasHolder.appendChild(topLayer);
+		mainDiv.appendChild(canvasHolder);
 
 		// game controller
-		toolbar.className = "zGo-toolbar";
+		var toolbar = document.createElement("div");
+		toolbar.className = "zgo-toolbar";
 		toolbar.style.width = boardWidth + "px";
 
-		var back = document.createElement("span"),
-			next = document.createElement("span"),
-			first = document.createElement("span"),
-			end = document.createElement("span"),
-			moveNo = document.createElement("span");
+		toolbar.innerHTML = '<span id="zgo-firstbtn" class="zgo-btn zgo-firstbtn"></span><span id="zgo-backbtn" class="zgo-btn zgo-backbtn"></span><span id="zgo-moveNo" class="zgo-moveNo">0</span><span id="zgo-nextbtn" class="zgo-btn zgo-nextbtn"></span><span id="zgo-endbtn" class="zgo-btn zgo-endbtn"></span>';
 
-		back.className = "zGo-btn zGo-backbtn";
-		next.className = "zGo-btn zGo-nextbtn";
-		first.className = "zGo-btn zGo-firstbtn";
-		end.className = "zGo-btn zGo-endbtn";
-		moveNo.className = "zGo-moveNo";
-		moveNo.innerHTML = "0";
-
-		back.onclick = function(e) {
-			var 
+		toolbar.onclick = function(e) {
+			var targetId = e.target.id,
 				curNode = game.getCurrentNode(),
 				oldBoard = game.getCurrentBoard(),
 				lastMove;
 
-			if (curNode.type === NodeType.Move) {
-				lastMove = curNode.stone;
-				game.prev();
-			} else {
-				game.prevMove();
+			switch (targetId) {
+				case "zgo-infobtn":
+					{
+						infoDialog.style.display = "block";
+						return;
+					}
+
+				case "zgo-firstbtn":
+					{
+						game.first();
+						break;
+					}
+
+				case "zgo-backbtn":
+					{
+						if (curNode.type === NodeType.Move) {
+							lastMove = curNode.stone;
+							game.prev();
+						} else {
+							game.prevMove();
+						}
+						break;
+					}
+
+				case "zgo-nextbtn":
+					{
+						// Handle: we are at the last node.
+						if (!curNode.next) {
+							return;
+						}
+
+						if (curNode.type === NodeType.Move) {
+							lastMove = curNode.stone;
+							while (game.getNextNode() && game.getNextNode().type === NodeType.Place) {
+								game.next();
+							}
+
+							// meaning next node is a move
+							if (game.getCurrentNode() === curNode) {
+								game.next();
+							}
+
+						} else {
+							game.next();
+						}
+						break;
+					}
+
+				case "zgo-endbtn":
+					{
+						// Handle: we are at the end node.
+						if (!curNode.next) {
+							return;
+						}
+
+						if (curNode.type === NodeType.Move) {
+							lastMove = curNode.stone;
+						}
+
+						game.end();
+						break;
+					}
+				default:
 			}
 
 			render(oldBoard, lastMove);
 		}
 
-		next.onclick = function(e) {
-			var curNode = game.getCurrentNode(),
-				oldBoard = game.getCurrentBoard(),
-				lastMove;
-
-			// Handle: we are at the last node.
-			if (!curNode.next) {
-				return;
-			}
-
-			if (curNode.type === NodeType.Move) {
-				lastMove = curNode.stone;
-				while (game.getNextNode() && game.getNextNode().type === NodeType.Place) {
-					game.next();
-				}
-
-				// meaning next node is a move
-				if (game.getCurrentNode() === curNode) {
-					game.next();
-				}
-				
-			} else {
-				game.next();
-			}
-
-			render(oldBoard, lastMove);			
-		}
-
-		first.onclick = function(e) {
-			var oldBoard = game.getCurrentBoard();
-			game.first();
-			render(oldBoard);
-		}
-
-		end.onclick = function(e) {
-			var curNode = game.getCurrentNode(),
-				oldBoard = game.getCurrentBoard(),
-				lastMove;
-
-			// Handle: we are at the end node.
-			if (!curNode.next) {
-				return;
-			}
-
-			if (curNode.type === NodeType.Move) {
-				lastMove = curNode.stone;
-			}
-
-			game.end();
-			render(oldBoard, lastMove);
-		}
-
-		toolbar.appendChild(back);
-		toolbar.appendChild(next);
-		toolbar.appendChild(first);
-		toolbar.appendChild(end);
-		toolbar.appendChild(moveNo);
-
-		mainDiv.appendChild(canvasHolder);
 		mainDiv.appendChild(toolbar);
 		container.appendChild(mainDiv);
 
-
 		// Compare new board with old board, and repaint different points.
-		// The 'old' board may not be actually old, coz game can go backward.
+		// The 'old' board may not be actually old, coz the game can go backward.
 		function render(oldBoard, lastMove) {
 			var newBoard = game.getCurrentBoard(),
 
@@ -895,7 +777,6 @@
 				oldBoard = oldBoard || game.getRoot().board,
 
 				curNode = game.getCurrentNode(),
-
 				x,
 				y,
 				color;
@@ -959,11 +840,48 @@
 
 			ctx1.restore();
 
-			moveNo.innerHTML = game.getCurrentNo();
+			document.getElementById("zgo-moveNo").innerHTML = game.getCurrentNo();
 		}
 
 		this.render = render;
 	}
 
+
+	// constructor of zGo
+	var zGo = function(options) {
+
+		// if container is not a dom element, return null.
+		if (!options.container.nodeType || options.container.nodeType !== 1) {
+			return null;
+		}
+
+		this.version = version;
+
+		var width = parseInt(options.width);
+		width = (!isNaN(width) && width > 0 ? width : 520);
+
+		var game = new GameTree(19),
+			sgfUtil = new SGFUtil(game),
+			renderer = new Renderer(options.container, game, width);
+
+		if (typeof options.sgf === "string") {
+			sgfUtil.loadSgf(sgf);
+			renderer.render();
+		}
+	}
+
+	if (typeof module === "object" && module && typeof module.exports === "object") {
+		// CMD Support
+		module.exports = zGo;
+	} else {
+		// AMD Support
+		if (typeof define === 'function' && define.amd) {
+			define('zGo', [], function() {
+				return zGo;
+			});
+		}
+	}
+
 	window.zGo = zGo;
-})();
+
+})(window);

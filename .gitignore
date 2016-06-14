@@ -1,0 +1,14 @@
+*.diff
+*.bak
+.DS_Store
+Thumbs.db
+.project
+.lastbuildtime
+.svn/
+node_modules/
+_site
+.idea
+.idea/
+.settings/
+*.7z
+git-m

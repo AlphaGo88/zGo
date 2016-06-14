@@ -1,18 +1,17 @@
-
-.zGo-main{
+.zgo-main{
     position: relative;
     margin: 0 auto;
     padding: 20px
 }
-.zGo-canvasholder{
+.zgo-canvasholder{
     position: relative;
 }
-.zGo-board{
+.zgo-board{
     width: 100%;
     height: 100%;
     background-color: rgb(230,180,70);
 }
-.zGo-toplayer{
+.zgo-toplayer{
     position: absolute;
     width: 100%;
     height: 100%;
@@ -20,16 +19,22 @@
     left: 0;
     z-index: 1;
 }
-.zGo-toolbar{
+.zgo-toolbar{
     position: relative;
     background-color: rgb(27,88,184);
     height: 40px;
 }
-.zGo-canvasholder, .zGo-board, .zGo-toplayer, .zGo-toolbar{
+.zgo-infoarea{
+    float: right;
+    width: 100px;
+    height: 100%;
+    border: 1px solid #000;
+}
+.zgo-canvasholder, .zgo-board, .zgo-toplayer, .zgo-toolbar{
     margin: 0;
     padding: 0;
 }
-.zGo-moveNo{
+.zgo-moveNo{
     position: absolute;
     display: inline-block;
     width: 50px;
@@ -42,65 +47,74 @@
 }
 
 /*buttons*/
-.zGo-btn{
+.zgo-btn{
     position: absolute;
     display: inline-block;
     top: 50%;
     margin-top: -12px;
     height: 24px;
     font-size: 0;
+    cursor: pointer;
 }
-.zGo-btn:hover{
+.zgo-btn:hover{
     box-shadow: 0 0 8px #fff;
 }
-.zGo-btn:after, .zGo-btn:before{
+.zgo-btn:after, .zgo-btn:before{
     content: ' ';
     position: absolute;
 }
-.zGo-firstbtn{
+.zgo-infobtn{
+    left: 12px;
+    width: 10px;
+    color: #fff;
+    font-size: 22px;
+    line-height: 24px;
+    text-align: center;
+    font-family: ""; 
+}
+.zgo-firstbtn{
     left: 30%;
 }
-.zGo-backbtn{
+.zgo-backbtn{
     left: 40%;
 }
-.zGo-nextbtn{
+.zgo-nextbtn{
     left: 60%;
     margin-left: -15px;
 }
-.zGo-endbtn{
+.zgo-endbtn{
     right: 30%;
 }
-.zGo-firstbtn, .zGo-endbtn{
+.zgo-firstbtn, .zgo-endbtn{
     width: 24px;
 }
-.zGo-backbtn, .zGo-nextbtn{
+.zgo-backbtn, .zgo-nextbtn{
     width: 16px;
 }
-.zGo-firstbtn:after, .zGo-backbtn:after{
+.zgo-firstbtn:after, .zgo-backbtn:after{
     border-top: 12px solid transparent;
     border-bottom: 12px solid transparent;
     border-right: 15px solid #fff;
 }
-.zGo-nextbtn:after, .zGo-endbtn:after{
+.zgo-nextbtn:after, .zgo-endbtn:after{
     border-top: 12px solid transparent;
     border-bottom: 12px solid transparent;
     border-left: 15px solid #fff;
 }
-
-.zGo-firstbtn:before{
+.zgo-firstbtn:before{
     height: 24px;
     left: 2px;
     border-left: 4px solid #fff;
 }
-.zGo-firstbtn:after{
+.zgo-firstbtn:after{
     left: 6px;
 }
-.zGo-endbtn:before{
+.zgo-endbtn:before{
     right: 2px;
     height: 24px;
     border-right: 4px solid #fff;
 }
-.zGo-endbtn:after{
+.zgo-endbtn:after{
     left: 2px;
 }
 
